@@ -1,0 +1,28 @@
+[
+  {
+    "project_id": 101,
+    "form_id": "FORM001",
+    "team_id": "201",
+    "submissions_id": "SUB001",
+    "table_name": "household_survey",
+    "raw_data": "{\"team_data\": {\"team_id\": \"201\"}}",
+    "user_id": 1,
+    "form_df_main_id": 1001,
+    "odk_form_id": 301,
+    "created_at": "2025-07-02T10:00:00.000Z",
+    "updated_at": "2025-07-02T10:00:00.000Z"
+  },
+  {
+    "project_id": 102,
+    "form_id": "FORM002",
+    "team_id": "202",
+    "submissions_id": "SUB002",
+    "table_name": "community_survey",
+    "raw_data": "{\"team_data\": {\"team_id\": \"202\"}}",
+    "user_id": 2,
+    "form_df_main_id": 1002,
+    "odk_form_id": 302,
+    "created_at": "2025-07-02T10:00:00.000Z",
+    "updated_at": "2025-07-02T10:00:00.000Z"
+  }
+]

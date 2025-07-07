@@ -1,23 +1,46 @@
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import { useSelector } from "react-redux";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+/*  Public routes  */
+import Login from "./pages/loginPage";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import AppLayout from "./layouts/AppLayout"; // New layout wrapper
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { allAppRoutes } from "./routes/index.js";
 
 function App() {
+  const { darkMode } = useSelector((state) => state.ui);
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className={darkMode ? "dark" : ""}>
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* Protected route with layout */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+            {/* Private app routes */}
+            {allAppRoutes.map(({ path, element }, index) => (
+              <Route key={index} path={path} element={element} />
+            ))}
+          </Route>
+        </Routes>
+      </Router>
     </div>
   );
 }
