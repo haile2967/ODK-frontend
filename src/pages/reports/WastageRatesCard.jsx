@@ -1,26 +1,54 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useContext } from "react";
 import { useSelector } from "react-redux";
-import { legendRules2 } from "./legendConfig.jsx";
+import { useDose } from "./DoseContext"; // Adjust path
+import { legendRules4, legendRules3 } from "./legendConfig.jsx";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import * as XLSX from "xlsx";
+import { exportToExcel, getColorHex } from "../../utils/downloadUtils";
 
-function WastageRatesCard({ onBack }) {
-  const coverageReport = useSelector((state) => state.coverageReport) || {};
-  console.log("coverageReport:", coverageReport); // Debug: Check Redux data
-  const { dfaData = [], dosesPerVial = 20 } = coverageReport; // Fallback to 20 if dosesPerVial is undefined
+function WastageRatesCard() {
+  const { dosesPerVial } = useDose(); // Access dosesPerVial from context
+  const { filteredDfaData, selectedProjectId, selectedFormId } = useSelector((state) => state.coverageReport);
   const [selectedTable, setSelectedTable] = useState("wastage");
   const [showPopup, setShowPopup] = useState(false);
+  const tableRef = useRef(null);
 
-  // Aggregate flattened data by state, region, and district
+  const currentDateTime = new Date().toLocaleString("en-US", { timeZone: "Africa/Nairobi", hour12: true });
+  console.log("filteredDfaData in ZeroDoseByRegion:", filteredDfaData);
+  console.log("selectedProjectId:", selectedProjectId);
+  console.log("selectedFormId:", selectedFormId);
+  console.log("dosesPerVial from context:", dosesPerVial); // Log the received value
+
+  const isFilterSelected = selectedProjectId !== "" && selectedProjectId !== "all" && selectedFormId !== "";
+
+  if (!isFilterSelected) {
+    return (
+      <div className="bg-white p-4 rounded-lg shadow max-w-full overflow-x-auto mx-auto mt-6">
+        <h3 className="text-lg font-semibold text-gray-900">DFAs with High Negative Wastage Rate and High Percentage of Zero Doses</h3>
+        <div className="text-center text-red-600 font-medium">
+          Please select a Project ID or Form ID in Report Configuration
+        </div>
+      </div>
+    );
+  }
+
   const getRegionData = () => {
     const regionMap = {};
-    if (!Array.isArray(dfaData)) return [];
-    dfaData.forEach((item) => {
+    if (!Array.isArray(filteredDfaData)) {
+      console.log("dfaData is not an array:", filteredDfaData);
+      return [];
+    }
+    console.log("Raw dfaData:", filteredDfaData);
+
+    filteredDfaData.forEach((item) => {
       const regionKey = `${item.state || ''}|${item.region || ''}`;
       const districtKey = `${item.dfa_cod || ''}`;
       if (!regionMap[regionKey]) {
         regionMap[regionKey] = {
           state: item.state || '',
           region: item.region || '',
-          districts: {},
+          districts: [],
         };
       }
       if (!regionMap[regionKey].districts[districtKey]) {
@@ -29,8 +57,9 @@ function WastageRatesCard({ onBack }) {
           dfa_cod: item.dfa_cod || '',
           totalVaccinated: 0,
           opvVialsUsed: 0,
-          dosesUsed: 0,
+          NumberOfdosesUsed: 0,
           zeroOccurrences: 0,
+          dosesPerVial: dosesPerVial, // Use context value with fallback
         };
       }
       const vaccinated =
@@ -38,54 +67,73 @@ function WastageRatesCard({ onBack }) {
         (Number(item.vacinated_12_59_zero_occurence) || 0) +
         (Number(item.vacinated_0_11_multiple_occurence) || 0) +
         (Number(item.vacinated_12_59_multiple_occurence) || 0);
+        
       regionMap[regionKey].districts[districtKey].totalVaccinated += vaccinated;
       regionMap[regionKey].districts[districtKey].opvVialsUsed += Number(item.opv_received_total) || 0;
-      regionMap[regionKey].districts[districtKey].dosesUsed += Number(item.opv_usedemp_total) || 0;
+      regionMap[regionKey].districts[districtKey].NumberOfdosesUsed += Number(item.opv_usedemp_total) || 0;
       regionMap[regionKey].districts[districtKey].zeroOccurrences +=
         (Number(item.vacinated_0_11_zero_occurence) || 0) +
         (Number(item.vacinated_12_59_zero_occurence) || 0);
     });
-    return Object.values(regionMap).map((region) => ({
+
+    const result = Object.values(regionMap).map((region) => ({
       ...region,
       totalVaccinated: Object.values(region.districts).reduce((sum, d) => sum + d.totalVaccinated, 0),
       opvVialsUsed: Object.values(region.districts).reduce((sum, d) => sum + d.opvVialsUsed, 0),
-      dosesUsed: Object.values(region.districts).reduce((sum, d) => sum + d.dosesUsed, 0),
+      NumberOfdosesUsed: Object.values(region.districts).reduce((sum, d) => sum + d.NumberOfdosesUsed, 0),
       zeroOccurrences: Object.values(region.districts).reduce((sum, d) => sum + d.zeroOccurrences, 0),
+      dosesPerVial: dosesPerVial, // Use context value with fallback
     }));
+    console.log("Region Data:", result);
+    return result;
   };
 
-  // Calculate wastage rate using dosesPerVial from Redux
-  const calculateWastageRate = (vaccinated, opvVialsUsed) => {
-    if (vaccinated > 0 && opvVialsUsed > 0 && dosesPerVial > 0) {
-      const potentialDoses = opvVialsUsed * dosesPerVial;
-      const rate = (1 - vaccinated / potentialDoses) * 100;
-      return isNaN(rate) ? 0 : rate.toFixed(1);
+  const calculateWastageRate = (vaccinated, NumberOfdosesUsed) => {
+    const vaccinatedNum = Number(vaccinated) || 0;
+    const NumberOfdosesUsedNum = Number(NumberOfdosesUsed) || 0;
+    const totalDoses = NumberOfdosesUsedNum * (dosesPerVial || 20); // Use context value with fallback
+    console.log("Wastage Calc Inputs:", { vaccinatedNum, NumberOfdosesUsedNum, totalDoses });
+
+    if (totalDoses > 0) {
+      const difference = totalDoses - vaccinatedNum;
+      const rate = (difference / totalDoses) * 100;
+      console.log("Wastage Calc Steps:", { difference, rate });
+      if (isNaN(rate) || !isFinite(rate)) {
+        console.log("Invalid wastage calculation");
+        return { rate: 0, isNegative: false, error: "Invalid calculation" };
+      }
+      return { rate: rate.toFixed(1), isNegative: rate < 0, error: null };
     }
-    return 0;
+    console.log("Wastage Calc: Invalid input data, defaulting to 0%");
+    return { rate: 0, isNegative: false, error: "Invalid input data" };
   };
 
-  // Calculate overall wastage rate
   const calculateOverallWastageRate = () => {
     const totals = getRegionData().reduce(
       (acc, item) => ({
         totalVaccinated: acc.totalVaccinated + item.totalVaccinated,
-        opvVialsUsed: acc.opvVialsUsed + item.opvVialsUsed,
+        NumberOfdosesUsed: acc.NumberOfdosesUsed + item.NumberOfdosesUsed,
       }),
-      { totalVaccinated: 0, opvVialsUsed: 0 }
+      { totalVaccinated: 0, NumberOfdosesUsed: 0 }
     );
-    return calculateWastageRate(totals.totalVaccinated, totals.opvVialsUsed);
+    const result = calculateWastageRate(totals.totalVaccinated, totals.NumberOfdosesUsed);
+    console.log("Overall Wastage Rate Calc:", { totals, result });
+    return result.rate;
   };
 
-  // Calculate percentage of zero doses
   const calculateZeroDosePercent = (zeroOccurrences, totalVaccinated) => {
-    if (totalVaccinated > 0) {
-      const percent = (zeroOccurrences / totalVaccinated) * 100;
+    const zeroNum = Number(zeroOccurrences) || 0;
+    const vaccinatedNum = Number(totalVaccinated) || 0;
+    console.log("Zero Dose Calc Inputs:", { zeroNum, vaccinatedNum });
+    if (vaccinatedNum > 0) {
+      const percent = (zeroNum / vaccinatedNum) * 100;
+      console.log("Zero Dose Calc:", { percent });
       return isNaN(percent) ? 0 : percent.toFixed(1);
     }
+    console.log("Zero Dose Calc: No vaccinated data");
     return 0;
   };
 
-  // Calculate overall zero dose percentage
   const calculateOverallZeroDosePercent = () => {
     const totals = getRegionData().reduce(
       (acc, item) => ({
@@ -94,24 +142,35 @@ function WastageRatesCard({ onBack }) {
       }),
       { zeroOccurrences: 0, totalVaccinated: 0 }
     );
-    return calculateZeroDosePercent(totals.zeroOccurrences, totals.totalVaccinated);
+    const result = calculateZeroDosePercent(totals.zeroOccurrences, totals.totalVaccinated);
+    console.log("Overall Zero Dose % Calc:", { totals, result });
+    return result;
   };
 
-  // Determine class based on percentage
-  const getClassByPercentage = (percentage) => {
+  const getClassByPercentage = (percentage, isNegative = false) => {
     const numPercent = parseFloat(percentage) || 0;
-    const rule = legendRules2.find((r) => numPercent >= r.min && numPercent <= r.max);
+    const rules = selectedTable === "wastage" ? legendRules4 : legendRules3;
+    if (selectedTable === "wastage" && isNegative) {
+      return "bg-red-50 text-red-600";
+    }
+    const rule = rules.find((r) => numPercent >= r.min && numPercent <= r.max);
     return rule ? rule.className : "";
   };
 
-  // Legend tooltip content
-  const getLegendTooltip = (rule) => `${rule.range}: ${rule.color === "Purple" ? "Negative or zero wastage — potential over-utilization or data issue" : "Positive wastage — normal or excess usage"}`;
+  const getLegendTooltip = (rule) => {
+    if (selectedTable === "wastage") {
+      return `${rule.range}: ${rule.description}`;
+    } else {
+      return `${rule.range}: ${
+        rule.color === "Green" ? "Very low zero-dose rate — good coverage" :
+        rule.color === "Yellow" ? "Moderate zero-dose rate — needs improvement" :
+        rule.color === "Red" ? "High zero-dose rate — action needed" :
+        "Critical zero-dose rate — very poor coverage"
+      }`;
+    }
+  };
 
-  // Define threshold for high zero doses
-  const ZERO_DOSE_THRESHOLD = 50;
-
-  // Render loading or error state
-  if (!dfaData || dfaData.length === 0 || !Array.isArray(dfaData)) {
+  if (!filteredDfaData || filteredDfaData.length === 0 || !Array.isArray(filteredDfaData)) {
     return (
       <div className="bg-white p-6 rounded-lg shadow">
         <div className="animate-pulse flex space-x-4">
@@ -135,22 +194,99 @@ function WastageRatesCard({ onBack }) {
     );
   }
 
+  const exportToPDF = async () => {
+    try {
+      const canvas = await html2canvas(tableRef.current, {
+        scale: 2,
+        useCORS: true,
+      });
+      const imgData = canvas.toDataURL("image/png");
+      const doc = new jsPDF({ putOnlyUsedFonts: true, orientation: "landscape" });
+      const imgWidth = 280;
+      const pageHeight = 200;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 20;
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("DFAs with High Negative Wastage Rate and High Percentage of Zero Doses", 10, 10);
+
+      doc.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + 20;
+        doc.addPage();
+        doc.text("DFAs with High Negative Wastage Rate and High Percentage of Zero Doses", 10, 10);
+        doc.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      const date = new Date().toISOString().split("T")[0];
+      doc.save(`wastage_rates_${selectedTable}_${date}.pdf`);
+    } catch (error) {
+      console.error("PDF export failed:", error);
+      alert("Failed to export PDF. Please check the console for details.");
+    }
+  };
+
+  const exportToExcel = () => {
+    try {
+      const districtData = regionData.flatMap((region) =>
+        Object.values(region.districts).map((district) => ({
+          state: region.state,
+          region: region.region,
+          district: district.district,
+          dfa_cod: district.dfa_cod,
+          ...(selectedTable === "wastage"
+            ? {
+                "Wastage Rate (%)": calculateWastageRate(
+                  district.totalVaccinated,
+                  district.NumberOfdosesUsed
+                ).rate + "%",
+              }
+            : {
+                "Zero Doses (%)": calculateZeroDosePercent(
+                  district.zeroOccurrences,
+                  district.totalVaccinated
+                ) + "%",
+              }),
+        }))
+      );
+      const grandTotal = selectedTable === "wastage"
+        ? `${calculateOverallWastageRate()}%`
+        : `${calculateOverallZeroDosePercent()}%`;
+      exportToExcel(districtData, [selectedTable === "wastage" ? "Wastage Rate (%)" : "Zero Doses (%)"], grandTotal);
+    } catch (error) {
+      console.error("Excel export failed:", error);
+      alert("Failed to export Excel. Please check the console for details.");
+    }
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">DFAs with High Negative Wastage Rate and High Percentage of Zero Doses</h3>
-        {onBack && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">DFAs with High Negative Wastage Rate and High Percentage of Zero Doses</h3>
+          <p className="text-xs text-gray-500">Updated: {currentDateTime}</p>
+        </div>
+        <div className="space-x-2">
           <button
-            className="bg-gray-200 px-4 py-1 rounded hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
-            onClick={onBack}
-            aria-label="Back to reports"
+            onClick={exportToPDF}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
           >
-            Back
+            Export to PDF
           </button>
-        )}
+          <button
+            onClick={exportToExcel}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+          >
+            Export to Excel
+          </button>
+        </div>
       </div>
 
-      {/* Styled Button Group */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-2">Select Table:</label>
         <div className="inline-flex rounded-md shadow-sm" role="group" aria-label="Table selection">
@@ -183,9 +319,15 @@ function WastageRatesCard({ onBack }) {
         </div>
       </div>
 
-      {/* Legend Row with Clickable Colors */}
       <div className="flex justify-start mb-4 space-x-2">
-        {legendRules2.map((rule) => (
+        {selectedTable === "wastage" ? legendRules4.map((rule) => (
+          <div
+            key={rule.color}
+            className={`w-6 h-6 ${rule.className} rounded cursor-pointer`}
+            onClick={() => setShowPopup(true)}
+            title={getLegendTooltip(rule)}
+          ></div>
+        )) : legendRules3.map((rule) => (
           <div
             key={rule.color}
             className={`w-6 h-6 ${rule.className} rounded cursor-pointer`}
@@ -195,7 +337,6 @@ function WastageRatesCard({ onBack }) {
         ))}
       </div>
 
-      {/* Popup for Legend Details */}
       {showPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-100">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full m-4 relative">
@@ -207,7 +348,7 @@ function WastageRatesCard({ onBack }) {
             </button>
             <h4 className="text-sm font-semibold mb-4 text-black">Legend Details</h4>
             <ul className="pl-5 space-y-2">
-              {legendRules2.map((rule) => (
+              {(selectedTable === "wastage" ? legendRules4 : legendRules3).map((rule) => (
                 <li key={rule.color} className="mb-2 text-xs text-black">
                   <span className={`inline-block w-4 h-4 ${rule.className} mr-2`}></span>
                   {getLegendTooltip(rule)}
@@ -218,122 +359,123 @@ function WastageRatesCard({ onBack }) {
         </div>
       )}
 
-      {/* Conditional Table Rendering */}
-      {selectedTable === "wastage" ? (
-        <table className="min-w-full border-collapse border border-gray-300 text-xs">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.state</th>
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.region</th>
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.district</th>
-              <th className="py-0.5 px-2 border border-gray-300">Sum of Wastage Rate (%)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {regionData.map((region) =>
-              Object.values(region.districts).map((district, distIdx, arr) => {
-                const wastageRate = calculateWastageRate(district.totalVaccinated, district.opvVialsUsed);
-                const zeroPercent = calculateZeroDosePercent(district.zeroOccurrences, district.totalVaccinated);
-                const highZeroDoses = parseFloat(zeroPercent) > ZERO_DOSE_THRESHOLD;
-                if (wastageRate < 0 || highZeroDoses) {
+      <div ref={tableRef}>
+        {selectedTable === "wastage" ? (
+          <table className="min-w-full border-collapse border border-gray-300 text-xs">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.state</th>
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.region</th>
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.district</th>
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.dfa_code</th>
+                <th className="py-0.5 px-2 border border-gray-300" title="((NumberOfdosesUsed * dosesPerVial - totalVaccinated) / (NumberOfdosesUsed * dosesPerVial)) * 100">Sum of Wastage Rate (%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {regionData.map((region, regionIdx) =>
+                Object.values(region.districts).map((district, distIdx, arr) => {
+                  const wastage = calculateWastageRate(
+                    district.totalVaccinated,
+                    district.NumberOfdosesUsed
+                  );
                   return (
                     <tr
                       key={`${region.state}-${region.region}-${district.district}-${distIdx}`}
                       className={distIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}
                     >
                       {distIdx === 0 ? (
-                        <td
-                          className="py-0.5 px-2 border border-gray-300"
-                          rowSpan={arr.length}
-                        >
-                          {region.state}
-                        </td>
+                        <>
+                          <td
+                            className="py-0.5 px-2 border border-gray-300"
+                            rowSpan={arr.length}
+                          >
+                            {region.state || "N/A"}
+                          </td>
+                          <td
+                            className="py-0.5 px-2 border border-gray-300"
+                            rowSpan={arr.length}
+                          >
+                            {region.region || "N/A"}
+                          </td>
+                        </>
                       ) : null}
-                      {distIdx === 0 ? (
-                        <td
-                          className="py-0.5 px-2 border border-gray-300"
-                          rowSpan={arr.length}
-                        >
-                          {region.region}
-                        </td>
-                      ) : null}
-                      <td className="py-0.5 px-2 border border-gray-300">{district.district}</td>
-                      <td className={`py-0.5 px-2 border border-gray-300 ${getClassByPercentage(wastageRate)}`}>
-                        {wastageRate}%
+                      <td className="py-0.5 px-2 border border-gray-300">{district.district || "N/A"}</td>
+                      <td className="py-0.5 px-2 border border-gray-300">{district.dfa_cod || "N/A"}</td>
+                      <td className={`py-0.5 px-2 border border-gray-300 ${getClassByPercentage(wastage.rate, wastage.isNegative)}`}>
+                        {wastage.rate}% {wastage.isNegative && "(Negative)"}
                       </td>
                     </tr>
                   );
-                }
-                return null;
-              })
-            ).filter(Boolean).concat(
-              <tr key="overall-total" className="bg-gray-100 font-semibold">
-                <td className="py-0.5 px-2 border border-gray-300" colSpan="3">Overall Total</td>
-                <td className="py-0.5 px-2 border border-gray-300">
-                  {calculateOverallWastageRate()}%
-                </td>
+                })
+              ).concat(
+                <tr key="overall-total" className="bg-gray-100 font-semibold">
+                  <td className="py-0.5 px-2 border border-gray-300" colSpan="4">Overall Total</td>
+                  <td className="py-0.5 px-2 border border-gray-300">
+                    {calculateOverallWastageRate()}%
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        ) : (
+          <table className="min-w-full border-collapse border border-gray-300 text-xs">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.state</th>
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.region</th>
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.district</th>
+                <th className="py-0.5 px-2 border border-gray-300">Submissions.dfa_code</th>
+                <th className="py-0.5 px-2 border border-gray-300" title="(zeroOccurrences / totalVaccinated) * 100">Sum of % of Zero Doses Total</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      ) : (
-        <table className="min-w-full border-collapse border border-gray-300 text-xs">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.state</th>
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.region</th>
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.district</th>
-              <th className="py-0.5 px-2 border border-gray-300">Submissions.dfa_cod</th>
-              <th className="py-0.5 px-2 border border-gray-300">Sum of % of Zero Doses Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {regionData.map((region) =>
-              Object.values(region.districts).map((district, distIdx, arr) => {
-                const zeroPercent = calculateZeroDosePercent(district.zeroOccurrences, district.totalVaccinated);
-                if (parseFloat(zeroPercent) > 0) {
-                  return (
-                    <tr
-                      key={`${region.state}-${region.region}-${district.district}-${distIdx}`}
-                      className={distIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                    >
-                      {distIdx === 0 ? (
-                        <td
-                          className="py-0.5 px-2 border border-gray-300"
-                          rowSpan={arr.length}
-                        >
-                          {region.state}
+            </thead>
+            <tbody>
+              {regionData.map((region, regionIdx) =>
+                Object.values(region.districts).map((district, distIdx, arr) => {
+                  const zeroPercent = calculateZeroDosePercent(district.zeroOccurrences, district.totalVaccinated);
+                  if (parseFloat(zeroPercent) > 0) {
+                    return (
+                      <tr
+                        key={`${region.state}-${region.region}-${district.district}-${distIdx}`}
+                        className={distIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                      >
+                        {distIdx === 0 ? (
+                          <>
+                            <td
+                              className="py-0.5 px-2 border border-gray-300"
+                              rowSpan={arr.length}
+                            >
+                              {region.state || "N/A"}
+                            </td>
+                            <td
+                              className="py-0.5 px-2 border border-gray-300"
+                              rowSpan={arr.length}
+                            >
+                              {region.region || "N/A"}
+                            </td>
+                          </>
+                        ) : null}
+                        <td className="py-0.5 px-2 border border-gray-300">{district.district || "N/A"}</td>
+                        <td className="py-0.5 px-2 border border-gray-300">{district.dfa_cod || "N/A"}</td>
+                        <td className={`py-0.5 px-2 border border-gray-300 ${getClassByPercentage(zeroPercent)}`}>
+                          {zeroPercent}%
                         </td>
-                      ) : null}
-                      {distIdx === 0 ? (
-                        <td
-                          className="py-0.5 px-2 border border-gray-300"
-                          rowSpan={arr.length}
-                        >
-                          {region.region}
-                        </td>
-                      ) : null}
-                      <td className="py-0.5 px-2 border border-gray-300">{district.district}</td>
-                      <td className="py-0.5 px-2 border border-gray-300">{district.dfa_cod}</td>
-                      <td className={`py-0.5 px-2 border border-gray-300 ${getClassByPercentage(zeroPercent)}`}>
-                        {zeroPercent}%
-                      </td>
-                    </tr>
-                  );
-                }
-                return null;
-              })
-            ).filter(Boolean).concat(
-              <tr key="overall-total" className="bg-gray-100 font-semibold">
-                <td className="py-0.5 px-2 border border-gray-300" colSpan="4">Overall Total</td>
-                <td className="py-0.5 px-2 border border-gray-300">
-                  {calculateOverallZeroDosePercent()}%
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      )}
+                      </tr>
+                    );
+                  }
+                  return null;
+                })
+              ).filter(Boolean).concat(
+                <tr key="overall-total" className="bg-gray-100 font-semibold">
+                  <td className="py-0.5 px-2 border border-gray-300" colSpan="4">Overall Total</td>
+                  <td className="py-0.5 px-2 border border-gray-300">
+                    {calculateOverallZeroDosePercent()}%
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

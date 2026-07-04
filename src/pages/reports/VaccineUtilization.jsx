@@ -1,75 +1,144 @@
-import React, { useState } from "react";
-import VaccineUtilizationCard from "./VaccineUtilizationCard";
-import WastageRatesCard from "./WastageRatesCard";
-import DistrictZeroDosesCard from "./DistrictZeroDosesCard";
+import React, { useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
+import { ChartBarIcon, ExclamationTriangleIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { Row, Col, Card, Button, Typography } from 'antd';
+
+const { Title, Text } = Typography;
 
 function VaccineUtilization() {
-  const [activeCard, setActiveCard] = useState(null);
+  const navigate = useNavigate();
+  const { selectedProjectId, selectedFormId } = useSelector((state) => state.coverageReport);
+  const [hoveredCard, setHoveredCard] = useState(null);
 
-  if (activeCard) {
-    return (
-      <div className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => setActiveCard(null)}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded"
-          >
-              {/* Simple back arrow */}
-          <svg width="18" height="18" fill="none" viewBox="0 0 20 20" className="mr-2">
-            <path d="M12.5 16L7.5 10L12.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          
-    
-          </button>
-        </div>
-        {activeCard === "VaccineUtilization" && <VaccineUtilizationCard />}
-        {activeCard === "WastageRates" && <WastageRatesCard />}
-        {activeCard === "ZeroDoses" && <DistrictZeroDosesCard />}
-      </div>
-    );
-  }
+  // Debug: Log current path and selections
+  console.log("Rendering VaccineUtilization at", window.location.pathname);
+  console.log("Selected Project ID:", selectedProjectId);
+  console.log("Selected Form ID:", selectedFormId);
+
+  // // Check if at least one filter is selected
+  // const isFilterSelected = selectedProjectId !== "" || selectedFormId !== "";
+
+  // // Render message if no filters are selected
+  // if (!isFilterSelected) {
+  //   return (
+  //     <div className="p-4 max-w-5xl mx-auto">
+  //       <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">Vaccine Utilization Report</h2>
+  //       <div className="text-center text-red-600 font-medium">
+  //         Please select a Project ID or Form ID in Report Configuration
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6 text-blue-700">Vaccine Utilization</h2>
-      <div className="flex gap-6 flex-wrap">
-        <button
-          className="bg-blue-100 border border-blue-300 rounded-lg p-6 cursor-pointer hover:bg-blue-200 flex-1 min-w-[250px] text-center"
-          onClick={() => setActiveCard("VaccineUtilization")}
-        >
-          <h3 className="text-lg font-semibold mb-2 text-blue-800">Vaccine Utilization and Wastage Rates (%) by Region</h3>
-          <p className="text-gray-700 mb-2">
-            View vaccine utilization and wastage rates summarized by region. Click to see detailed utilization metrics and wastage percentages.
-          </p>
-          <p className="text-xs text-blue-700">
-            This report helps you monitor and optimize vaccine usage across regions.
-          </p>
-        </button>
-        <button
-          className="bg-green-100 border border-green-300 rounded-lg p-6 cursor-pointer hover:bg-green-200 flex-1 min-w-[250px] text-center"
-          onClick={() => setActiveCard("WastageRates")}
-        >
-          <h3 className="text-lg font-semibold mb-2 text-green-800">DFAs with high Negative wastage rate and high percentage of Zero doses</h3>
-          <p className="text-gray-700 mb-2">
-            View DFAs with high negative wastage rates and high zero-dose percentages. Click to analyze and address potential issues.
-          </p>
-          <p className="text-xs text-green-800">
-            This report helps identify areas needing intervention for vaccine distribution.
-          </p>
-        </button>
-        <button
-          className="bg-green-100 border border-green-300 rounded-lg p-6 cursor-pointer hover:bg-green-200 flex-1 min-w-[250px] text-center"
-          onClick={() => setActiveCard("ZeroDoses")}
-        >
-          <h3 className="text-lg font-semibold mb-2 text-green-800">Zero Doses and Wastage Rates by District</h3>
-          <p className="text-gray-700 mb-2">
-            View zero-dose percentages (total and 0-11 months), doses used, and wastage rates by district. Click to explore detailed vaccine utilization data.
-          </p>
-          <p className="text-xs text-green-800">
-           This report highlights districts with high zero-dose rates to prioritize vaccination efforts.
-          </p>
-        </button>
+    <div className="p-4 max-w-5xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800 text-center">Vaccine Utilization Report</h2>
+      <div className="mb-6 text-center">
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold">Selected Project ID:</span>{" "}
+          {selectedProjectId || selectedProjectId === "all" ? selectedProjectId : "None"}
+        </p>
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold">Selected Form ID:</span>{" "}
+          {selectedFormId || selectedFormId === "all" ? selectedFormId : "None"}
+        </p>
       </div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={12}>
+          <Card
+            hoverable
+            className={`bg-white rounded-lg shadow-sm transition-all duration-300 cursor-pointer border-l-4 min-h-[180px] ${hoveredCard === 'Vaccine Utilization and Wastage Rates by Region' ? 'border-blue-500' : 'border-transparent'}`}
+            onClick={() => navigate('/vaccine_utilization/utilization')}
+            onMouseEnter={() => setHoveredCard('Vaccine Utilization and Wastage Rates by Region')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div className="flex items-start p-4">
+              <div className="p-3 bg-blue-100 rounded-full mr-4">
+                <ChartBarIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <Title level={4} className="text-gray-900 mb-2">Vaccine Utilization and Wastage Rates by Region</Title>
+                <Text type="secondary" className="block mb-2">
+                  View vaccine utilization and wastage rates summarized by region. Click for details.
+                </Text>
+                <Button
+                  type="link"
+                  className="p-0 text-blue-600 hover:text-blue-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/vaccine_utilization/utilization');
+                  }}
+                >
+                  View report →
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card
+            hoverable
+            className={`bg-white rounded-lg shadow-sm transition-all duration-300 cursor-pointer border-l-4 min-h-[180px] ${hoveredCard === 'DFAs with High Negative Wastage & Zero Doses' ? 'border-blue-500' : 'border-transparent'}`}
+            onClick={() => navigate('/vaccine_utilization/wastage')}
+            onMouseEnter={() => setHoveredCard('DFAs with High Negative Wastage & Zero Doses')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div className="flex items-start p-4">
+              <div className="p-3 bg-blue-100 rounded-full mr-4">
+                <ExclamationTriangleIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <Title level={4} className="text-gray-900 mb-2">DFAs with High Negative Wastage & Zero Doses</Title>
+                <Text type="secondary" className="block mb-2">
+                  View DFAs with high negative wastage and zero-dose rates. Click to analyze.
+                </Text>
+                <Button
+                  type="link"
+                  className="p-0 text-blue-600 hover:text-blue-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/vaccine_utilization/wastage');
+                  }}
+                >
+                  View report →
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card
+            hoverable
+            className={`bg-white rounded-lg shadow-sm transition-all duration-300 cursor-pointer border-l-4 min-h-[180px] ${hoveredCard === 'District Zero Doses Report' ? 'border-blue-500' : 'border-transparent'}`}
+            onClick={() => navigate('/vaccine_utilization/zero-doses')}
+            onMouseEnter={() => setHoveredCard('District Zero Doses Report')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div className="flex items-start p-4">
+              <div className="p-3 bg-blue-100 rounded-full mr-4">
+                <MapPinIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <Title level={4} className="text-gray-900 mb-2">District Zero Doses Report</Title>
+                <Text type="secondary" className="block mb-2">
+                  View zero-dose rates summarized by district. Click for details.
+                </Text>
+                <Button
+                  type="link"
+                  className="p-0 text-blue-600 hover:text-blue-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/vaccine_utilization/zero-doses');
+                  }}
+                >
+                  View report →
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 }

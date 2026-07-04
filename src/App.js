@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AppLayout from "./layouts/AppLayout"; // New layout wrapper
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { DoseProvider } from "./pages/reports/DoseContext";
 import { allAppRoutes } from "./routes/index.js";
 
 function App() {
@@ -19,27 +20,29 @@ function App() {
   return (
     <div className={darkMode ? "dark" : ""}>
       <Router>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
+        <DoseProvider> {/* Move DoseProvider here to wrap Routes */}
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
-          {/* Protected route with layout */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            {/* Private app routes */}
-            {allAppRoutes.map(({ path, element }, index) => (
-              <Route key={index} path={path} element={element} />
-            ))}
-          </Route>
-        </Routes>
+            {/* Protected route with layout */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              {/* Private app routes */}
+              {allAppRoutes.map(({ path, element }, index) => (
+                <Route key={index} path={path} element={element} />
+              ))}
+            </Route>
+          </Routes>
+        </DoseProvider>
       </Router>
     </div>
   );

@@ -18,3 +18,9 @@ export const legendRules3 = [
   { color: "Red", range: "15% – 30%", min: 15.01, max: 30, className: "bg-red-600 text-white" },
   { color: "Dark Red", range: "30% – 100%", min: 30.01, max: 100, className: "bg-red-800 text-white" },
 ];
+
+export const legendRules4 = [
+  { color: "Green", range: "0% – 9%", min: 0, max: 9, className: "bg-green-600 text-white", description: "Vaccine use is efficient with minimal waste." },
+  { color: "Yellow", range: "10% – 14%", min: 10, max: 14, className: "bg-yellow-400 text-gray-800", description: "Acceptable level" },
+  { color: "Red", range: "15% and up", min: 15, max: Infinity, className: "bg-red-600 text-white", description: "Too much wastage;" },
+];

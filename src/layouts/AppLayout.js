@@ -34,7 +34,7 @@ const AppLayout = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100">
+    <div className="flex flex-col min-h-screen bg-white-200">
       {/* Header */}
       <header className="w-full bg-white shadow px-4 py-3 border-b z-10">
         <Header toggleSidebar={toggleSidebar} />
@@ -52,7 +52,7 @@ const AppLayout = () => {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 overflow-y-auto">
+        <main className="flex-1 p-4 overflow-y-auto bg-gray-100">
           {isHome ? (
             <div className="text-center mt-10">
               <img

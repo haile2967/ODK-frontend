@@ -1,73 +1,117 @@
-import React, { useState } from "react";
-import VaccinationCoverageRCA from "./VaccinationCoverageRCA.jsx";
-import VaccinationCoverageSourceRCADATA from "./VaccinationCoverageSourceRCADATA.jsx";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { MapPinIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+import { Row, Col, Card, Button, Typography } from 'antd';
+
+const { Title, Text } = Typography;
 
 function VaccinationCoverage() {
-  const [activeCard, setActiveCard] = useState(null);
+  const navigate = useNavigate();
+  const { selectedProjectId, selectedFormId } = useSelector((state) => state.coverageReport);
+  const [hoveredCard, setHoveredCard] = useState(null);
 
-  if (activeCard === "vaccination-coverage-rca") {
-    return (
-      <div className="p-4">
-        <button
-          onClick={() => setActiveCard(null)}
-          className="mb-4 flex items-center bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded"
-        >
-          <svg width="18" height="18" fill="none" viewBox="0 0 20 20" className="mr-2">
-            <path d="M12.5 16L7.5 10L12.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <VaccinationCoverageRCA />
-      </div>
-    );
-  }
+  // Debug: Log current path and selections
+  console.log("Rendering VaccinationCoverage at", window.location.pathname);
+  console.log("Selected Project ID:", selectedProjectId);
+  console.log("Selected Form ID:", selectedFormId);
 
-  if (activeCard === "vaccination-coverage-source-rca-data") {
-    return (
-      <div className="p-4">
-        <button
-          onClick={() => setActiveCard(null)}
-          className="mb-4 flex items-center bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded"
-        >
-          <svg width="18" height="18" fill="none" viewBox="0 0 20 20" className="mr-2">
-            <path d="M12.5 16L7.5 10L12.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
-        <VaccinationCoverageSourceRCADATA />
-      </div>
-    );
-  }
+  // // Check if at least one filter is selected
+  // const isFilterSelected = selectedProjectId !== "" || selectedFormId !== "";
+
+  // // Render message if no filters are selected
+  // if (!isFilterSelected) {
+  //   return (
+  //     <div className="p-4 max-w-5xl mx-auto">
+  //       <h2 className="text-2xl font-bold mb-6 text-gray-800">Vaccination Coverage</h2>
+  //       <div className="text-center text-red-600 font-medium">
+  //         Please select a Project ID or Form ID in Report Configuration
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div className="p-4">
-      <h2 className="text-2xl font-bold mb-6 text-blue-700">Vaccination Coverage</h2>
-      <div className="flex gap-6 flex-wrap">
-        {/* Vaccination Coverage RCA Card */}
-        <div
-          className="bg-blue-100 border border-blue-300 rounded-lg p-6 flex-1 min-w-[250px] text-center cursor-pointer hover:bg-blue-200"
-          onClick={() => setActiveCard("vaccination-coverage-rca")}
-        >
-          <h3 className="text-lg font-semibold mb-2 text-blue-800">Vaccination Coverage-RCA</h3>
-          <p className="text-gray-700 mb-2">
-            View vaccination coverage data aggregated by region.
-          </p>
-          <p className="text-xs text-blue-700">
-            Click to see regional coverage details.
-          </p>
-        </div>
-        {/* Vaccination Coverage Source RCA Data Card */}
-        <div
-          className="bg-green-100 border border-green-300 rounded-lg p-6 flex-1 min-w-[250px] text-center cursor-pointer hover:bg-green-200"
-          onClick={() => setActiveCard("vaccination-coverage-source-rca-data")}
-        >
-          <h3 className="text-lg font-semibold mb-2 text-green-800">Vaccination Coverage Source of RCA Data</h3>
-          <p className="text-gray-700 mb-2">
-            Explore the sources of RCA data for vaccination coverage.
-          </p>
-          <p className="text-xs text-green-800">
-            Click to view detailed data sources.
-          </p>
-        </div>
+    <div className="p-4 max-w-5xl mx-auto">
+      <h2 className="text-2xl font-bold mb-6 text-gray-800">Vaccination Coverage</h2>
+      <div className="mb-6 text-center">
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold">Selected Project ID:</span>{" "}
+          {selectedProjectId || selectedProjectId === "all" ? selectedProjectId : "None"}
+        </p>
+        <p className="text-sm text-gray-700">
+          <span className="font-semibold">Selected Form ID:</span>{" "}
+          {selectedFormId || selectedFormId === "all" ? selectedFormId : "None"}
+        </p>
       </div>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={12}>
+          <Card
+            hoverable
+            className={`bg-white rounded-lg shadow-sm transition-all duration-300 cursor-pointer border-l-4 min-h-[180px] ${hoveredCard === 'Vaccination Coverage-RCA' ? 'border-blue-500' : 'border-transparent'}`}
+            onClick={() => navigate('/vaccination_coverage/rca')}
+            onMouseEnter={() => setHoveredCard('Vaccination Coverage-RCA')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div className="flex items-start p-4">
+              <div className="p-3 bg-blue-100 rounded-full mr-4">
+                <MapPinIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="h-[120px] flex flex-col justify-between">
+                <div>
+                  <Title level={4} className="text-gray-900 mb-2">Vaccination Coverage-RCA</Title>
+                  <Text type="secondary" className="block mb-2">
+                    View vaccination coverage data aggregated by region.
+                  </Text>
+                </div>
+                <Button
+                  type="link"
+                  className="p-0 text-blue-600 hover:text-blue-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/vaccination_coverage/rca');
+                  }}
+                >
+                  View report →
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} md={12}>
+          <Card
+            hoverable
+            className={`bg-white rounded-lg shadow-sm transition-all duration-300 cursor-pointer border-l-4 min-h-[180px] ${hoveredCard === 'Vaccination Coverage Source of RCA Data' ? 'border-blue-500' : 'border-transparent'}`}
+            onClick={() => navigate('/vaccination_coverage/source-rca-data')}
+            onMouseEnter={() => setHoveredCard('Vaccination Coverage Source of RCA Data')}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
+            <div className="flex items-start p-4">
+              <div className="p-3 bg-blue-100 rounded-full mr-4">
+                <DocumentTextIcon className="h-6 w-6 text-blue-600" />
+              </div>
+              <div className="h-[120px] flex flex-col justify-between">
+                <div>
+                  <Title level={4} className="text-gray-900 mb-2">Vaccination Coverage Source of RCA Data</Title>
+                  <Text type="secondary" className="block mb-2">
+                    Explore the sources of RCA data for vaccination coverage.
+                  </Text>
+                </div>
+                <Button
+                  type="link"
+                  className="p-0 text-blue-600 hover:text-blue-800"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate('/vaccination_coverage/source-rca-data');
+                  }}
+                >
+                  View report →
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
     </div>
   );
 }

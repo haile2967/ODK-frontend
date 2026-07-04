@@ -3,13 +3,13 @@ import { Navigate, Route, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { useAuth } from "../../pages/tokenMiddleware";
 const ProtectedRoute = ({ children }) => {
-  const location = useLocation();
-  const { accessToken } = useSelector((state) => state.auth);
+  // const location = useLocation();
+  // const { accessToken } = useSelector((state) => state.auth);
 
-  if (!accessToken) {
-    // Redirect to login page but save the attempted URL
-    return <Navigate to="/login" state={{ from: location }} replace />;
-  }
+  // if (!accessToken) {
+  //   // Redirect to login page but save the attempted URL
+  //   return <Navigate to="/login" state={{ from: location }} replace />;
+  // }
 
   return children;
 };

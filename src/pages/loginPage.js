@@ -11,20 +11,20 @@ const Login = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const dispatch = useDispatch();
+  // const dispatch = useDispatch();
   const navigate = useNavigate();
 
   const handleTraditionalLogin = async (e) => {
     e.preventDefault();
-    dispatch(clearError());
+    // dispatch(clearError());
 
-    if (!username || !password) {
-      dispatch(setError("Please fill in all fields"));
-      return;
-    }
+    // if (!username || !password) {
+    //   dispatch(setError("Please fill in all fields"));
+    //   return;
+    // }
 
     try {
-      await dispatch(loginUser({ username, password })).unwrap();
+      // await dispatch(loginUser({ username, password })).unwrap();
       navigate("/");
     } catch (err) {
       // Error is already set by the rejected action
